@@ -340,16 +340,19 @@ const dist=(x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const easeOut=(t)=>1-(1-t)**3;
 const easeInOut=(t)=>t<.5?4*t**3:1-(-2*t+2)**3/2;
+function hexToRgb(hex) {
+  if(!hex||hex.length<7) return '0,0,0';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
 
 // ════════════════════════════════════════════════════════════
 // GLOBALS
 // ════════════════════════════════════════════════════════════
 let sceneObjects=[], beams=[], fieldParticles=[], t=0;
 let current=0, animating=false, titleVisible=true;
-const TOTAL=13;
 
-// Init field particles
-for(let i=0;i<80;i++) fieldParticles.push(new FieldParticle());
+const TOTAL=13;
 
 // ════════════════════════════════════════════════════════════
 // ATOM CLASS
@@ -500,6 +503,9 @@ FieldParticle.prototype.draw = function() {
   ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,PI2); ctx.fill();
   ctx.globalAlpha=1;
 };
+
+// Init field particles (must be after FieldParticle is defined)
+for(let i=0;i<80;i++) fieldParticles.push(new FieldParticle());
 
 // ════════════════════════════════════════════════════════════
 // MOLECULE
@@ -1392,7 +1398,7 @@ function render(now) {
 
   // Connection lines on scene 0
   if(current===0) {
-    const atoms=sceneObjects.filter(o=>o instanceof Atom||o.constructor.name==='Atom');
+    const atoms=sceneObjects.filter(o=>o.r&&o.electrons&&!o.dead);
     ctx.save();
     for(let i=0;i<atoms.length;i++) {
       for(let j=i+1;j<atoms.length;j++) {
@@ -1417,7 +1423,7 @@ function render(now) {
   // Update & draw all objects
   for(const o of sceneObjects) {
     if(o.dead) continue;
-    if(o instanceof Molecule) o.update(dt,t);
+    if(o.atoms) o.update(dt,t); // Molecule
     else if(o.update) o.update(dt,t);
     if(o.draw) o.draw(t);
   }
@@ -1428,7 +1434,7 @@ function render(now) {
   }
 
   // Tooltip
-  const allAtoms=sceneObjects.filter(o=>o.r&&o.draw&&!o.dead&&!o.spasm);
+  const allAtoms=sceneObjects.filter(o=>o.r&&o.electrons&&!o.dead&&o.label);
   const hover=allAtoms.find(o=>dist(o.x,o.y,mx,my)<(o.r||20)+14);
   document.getElementById('tooltip').style.opacity=hover?'1':'0';
   if(hover) {
@@ -1474,16 +1480,21 @@ function flash(cb) {
 }
 
 function goToScene(n) {
-  if(animating||n===current) return;
-  // Leave hook
+  if(n<0||n>=TOTAL) return;
+  if(animating) return;
+  if(n===current) return;
   if(SCENES[current] && SCENES[current].onLeave) SCENES[current].onLeave();
   animating=true;
-  flash(()=>{
+  const f=document.getElementById('flash');
+  f.style.transition='opacity .1s';
+  f.style.opacity='.07';
+  setTimeout(()=>{
+    f.style.opacity='0';
     current=n;
     buildScene(current);
     updateHUD();
-    setTimeout(()=>animating=false,700);
-  });
+    setTimeout(()=>{ animating=false; }, 300);
+  }, 120);
 }
 
 function nextScene() {
@@ -1527,12 +1538,13 @@ document.addEventListener('touchend',e=>{
 // ════════════════════════════════════════════════════════════
 // TITLE SCREEN
 // ════════════════════════════════════════════════════════════
-let titleVisible=true;
 document.getElementById('title-start').addEventListener('click',()=>{
   titleVisible=false;
-  const ts=document.getElementById('title-screen');
-  ts.classList.add('hidden');
-  goToScene(0);
+  animating=false;
+  document.getElementById('title-screen').classList.add('hidden');
+  current=0;
+  buildScene(0);
+  updateHUD();
 });
 
 // ════════════════════════════════════════════════════════════
@@ -1540,22 +1552,15 @@ document.getElementById('title-start').addEventListener('click',()=>{
 // ════════════════════════════════════════════════════════════
 document.getElementById('end-restart').addEventListener('click',()=>{
   document.getElementById('end-screen').classList.remove('show');
+  animating=false;
+  current=1; // trick: set to 1 so goToScene(0) works
   goToScene(0);
 });
 
 // ════════════════════════════════════════════════════════════
-// UTILS
-// ════════════════════════════════════════════════════════════
-function hexToRgb(hex) {
-  if(!hex||hex.length<7) return '0,0,0';
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return `${r},${g},${b}`;
-}
-
-// ════════════════════════════════════════════════════════════
 // START — keep title screen until user clicks
 // ════════════════════════════════════════════════════════════
-buildScene(0); // preload scene 0 in background
+buildScene(0);
 </script>
 </body>
 </html>
