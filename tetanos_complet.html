@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le Tétanos — Présentation Interactive</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+:root {
+  --bg: #040810;
+  --teal: #00e5c3;
+  --red: #ff4060;
+  --gold: #ffcc44;
+  --blue: #4488ff;
+  --purple: #aa66ff;
+  --orange: #ff8844;
+  --green: #44ff88;
+  --white: #e8f4f8;
+  --dim: rgba(232,244,248,0.5);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Crimson Pro', serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  cursor: none;
+  user-select: none;
+}
+
+/* CURSOR */
+#cur { position:fixed; width:10px; height:10px; background:var(--teal); border-radius:50%; pointer-events:none; z-index:9999; transform:translate(-50%,-50%); mix-blend-mode:screen; transition:transform .1s; }
+#cur-ring { position:fixed; width:32px; height:32px; border:1px solid var(--teal); border-radius:50%; pointer-events:none; z-index:9998; transform:translate(-50%,-50%); opacity:0.4; transition:left .15s,top .15s; }
+
+/* MAIN CANVAS */
+#world { position:fixed; top:0;left:0;width:100%;height:100%; z-index:1; }
+
+/* HUD OVERLAY */
+#hud { position:fixed; top:0;left:0;width:100%;height:100%; z-index:10; pointer-events:none; }
+
+/* PROGRESS */
+#prog-bar { position:fixed; top:0;left:0;height:3px; background:linear-gradient(90deg,var(--teal),var(--gold)); z-index:100; transition:width .8s cubic-bezier(.4,0,.2,1); box-shadow:0 0 12px var(--teal); }
+#prog-text { position:fixed; top:14px; right:24px; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--teal); opacity:.6; z-index:100; }
+#chapter { position:fixed; top:14px; left:24px; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:4px; color:var(--teal); opacity:.6; z-index:100; text-transform:uppercase; }
+
+/* TITLE SCREEN */
+#title-screen {
+  position:fixed; top:0;left:0;width:100%;height:100%;
+  z-index:300; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 50%, rgba(0,229,195,.04) 0%, transparent 70%);
+  pointer-events:all;
+  transition:opacity 1.2s;
+}
+#title-screen.hidden { opacity:0; pointer-events:none; }
+
+#big-title {
+  font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(80px,14vw,180px);
+  line-height:.88;
+  text-align:center;
+  letter-spacing:8px;
+  background:linear-gradient(135deg, #e8f4f8 0%, #00e5c3 40%, #e8f4f8 60%, #ffcc44 100%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  filter:drop-shadow(0 0 40px rgba(0,229,195,.25));
+  animation:titlePulse 4s ease-in-out infinite;
+}
+@keyframes titlePulse { 0%,100%{filter:drop-shadow(0 0 40px rgba(0,229,195,.25))} 50%{filter:drop-shadow(0 0 70px rgba(0,229,195,.5))} }
+
+#title-sub {
+  font-family:'Crimson Pro',serif;
+  font-style:italic;
+  font-size:clamp(18px,2.5vw,28px);
+  color:rgba(232,244,248,.6);
+  letter-spacing:4px;
+  margin-top:16px;
+  text-align:center;
+  animation:fadeInUp 1.5s ease .8s both;
+}
+#title-context {
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:5px;
+  color:var(--teal);
+  opacity:.7;
+  text-transform:uppercase;
+  margin-top:10px;
+  text-align:center;
+  animation:fadeInUp 1.5s ease 1.2s both;
+}
+#title-start {
+  margin-top:48px;
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  letter-spacing:6px;
+  color:var(--teal);
+  border:1px solid rgba(0,229,195,.3);
+  padding:14px 40px;
+  cursor:pointer;
+  pointer-events:all;
+  text-transform:uppercase;
+  animation:fadeInUp 1.5s ease 1.8s both, btnPulse 2.5s ease 3s infinite;
+  transition:background .3s, color .3s;
+}
+#title-start:hover { background:rgba(0,229,195,.12); }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+@keyframes btnPulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,229,195,.3)} 50%{box-shadow:0 0 0 8px rgba(0,229,195,0)} }
+
+/* Title decorative lines */
+#title-deco {
+  width:80px; height:1px; background:linear-gradient(90deg,transparent,var(--teal),transparent);
+  margin:24px auto 0;
+  animation:fadeInUp 1.5s ease 1.4s both;
+}
+
+/* SCENE UI PANELS */
+#scene-panel {
+  position:fixed; bottom:0; left:0; right:0;
+  padding:28px 60px 36px;
+  background:linear-gradient(transparent,rgba(4,8,16,0.95) 40%);
+  z-index:20; pointer-events:none;
+  transition: opacity 0.5s;
+}
+#scene-tag { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:5px; color:var(--teal); text-transform:uppercase; margin-bottom:10px; }
+#scene-title { font-family:'Bebas Neue',sans-serif; font-size:clamp(36px,6vw,72px); line-height:.9; margin-bottom:12px; }
+#scene-body { font-size:clamp(15px,1.8vw,20px); line-height:1.7; color:rgba(232,244,248,.8); max-width:720px; }
+#scene-body strong { color:var(--teal); }
+#scene-body em { color:var(--gold); font-style:italic; }
+#scene-body .red { color:var(--red); }
+#scene-body .green { color:var(--green); }
+#scene-body .orange { color:var(--orange); }
+
+/* CLICK TO CONTINUE */
+#click-hint {
+  position:fixed; bottom:24px; right:40px;
+  font-family:'Space Mono',monospace; font-size:10px;
+  letter-spacing:4px; color:var(--teal); opacity:.45;
+  z-index:100; animation:ph 2.5s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes ph { 0%,100%{opacity:.25} 50%{opacity:.7} }
+
+/* DOTS NAV */
+#dots { position:fixed; left:24px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:100; }
+.dot { width:6px; height:6px; border-radius:50%; background:rgba(232,244,248,.2); cursor:pointer; transition:all .4s; pointer-events:all; }
+.dot.active { background:var(--teal); box-shadow:0 0 8px var(--teal); transform:scale(1.5); }
+.dot.done { background:rgba(0,229,195,.5); }
+
+/* LEGEND */
+#legend { position:fixed; top:50%; right:24px; transform:translateY(-50%); z-index:20; pointer-events:none; display:none; flex-direction:column; gap:8px; }
+.leg-row { display:flex; align-items:center; gap:8px; }
+.leg-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.leg-label { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; color:rgba(232,244,248,.6); text-transform:uppercase; }
+
+/* FLASH OVERLAY */
+#flash { position:fixed; top:0;left:0;width:100%;height:100%; background:var(--teal); opacity:0; pointer-events:none; z-index:500; transition:opacity .15s; }
+
+/* CORNER DECO */
+.cdc { position:fixed; width:36px; height:36px; opacity:.3; z-index:50; pointer-events:none; }
+.cdc.tl { top:10px; left:10px; border-top:1px solid var(--teal); border-left:1px solid var(--teal); }
+.cdc.br { bottom:10px; right:10px; border-bottom:1px solid var(--teal); border-right:1px solid var(--teal); }
+.cdc.tr { top:10px; right:10px; border-top:1px solid var(--teal); border-right:1px solid var(--teal); }
+.cdc.bl { bottom:10px; left:10px; border-bottom:1px solid var(--teal); border-left:1px solid var(--teal); }
+
+/* SCAN LINE */
+.scan { position:fixed; top:0;left:0;width:100%;height:100%; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.035) 2px,rgba(0,0,0,.035) 4px); pointer-events:none; z-index:8; }
+
+/* ATOM TOOLTIP */
+#tooltip {
+  position:fixed; z-index:200; pointer-events:none;
+  font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px;
+  background:rgba(4,8,16,.95); border:1px solid rgba(0,229,195,.3);
+  color:var(--teal); padding:6px 12px; border-radius:3px;
+  opacity:0; transition:opacity .25s; white-space:nowrap;
+}
+
+/* STATS OVERLAY */
+#stats-overlay {
+  position:fixed; top:50%; right:60px; transform:translateY(-50%);
+  z-index:20; pointer-events:none; display:none; flex-direction:column; gap:16px;
+}
+.stat-item { text-align:right; }
+.stat-num { font-family:'Bebas Neue',sans-serif; font-size:52px; line-height:1; color:var(--teal); text-shadow:0 0 30px rgba(0,229,195,.3); }
+.stat-num.red { color:var(--red); text-shadow:0 0 30px rgba(255,64,96,.3); }
+.stat-num.gold { color:var(--gold); text-shadow:0 0 30px rgba(255,204,68,.3); }
+.stat-lbl { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:3px; color:var(--dim); text-transform:uppercase; }
+
+/* CALENDAR OVERLAY */
+#calendar-overlay {
+  position:fixed; top:50%; right:50px; transform:translateY(-50%);
+  z-index:20; pointer-events:none; display:none; flex-direction:column; gap:6px;
+}
+.cal-row {
+  display:flex; align-items:center; gap:12px;
+  padding:6px 14px; border-left:2px solid var(--teal);
+  background:rgba(0,229,195,.05);
+  opacity:0; transform:translateX(20px);
+  animation:slideIn .5s ease forwards;
+}
+.cal-row:nth-child(1){animation-delay:.1s}
+.cal-row:nth-child(2){animation-delay:.2s}
+.cal-row:nth-child(3){animation-delay:.3s}
+.cal-row:nth-child(4){animation-delay:.4s}
+.cal-row:nth-child(5){animation-delay:.5s}
+.cal-row:nth-child(6){animation-delay:.6s}
+.cal-row:nth-child(7){animation-delay:.7s}
+.cal-row:nth-child(8){animation-delay:.8s}
+@keyframes slideIn { to{opacity:1;transform:translateX(0)} }
+.cal-age { font-family:'Bebas Neue',sans-serif; font-size:22px; color:var(--gold); min-width:70px; }
+.cal-label { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--dim); }
+
+/* SAFETY ICONS */
+#safety-overlay {
+  position:fixed; top:50%; right:50px; transform:translateY(-50%);
+  z-index:20; pointer-events:none; display:none; flex-direction:column; gap:12px;
+}
+.safety-item {
+  display:flex; align-items:center; gap:14px; padding:10px 20px;
+  background:rgba(68,255,136,.05); border:1px solid rgba(68,255,136,.15);
+  opacity:0; transform:translateX(20px);
+  animation:slideIn .5s ease forwards;
+}
+.safety-item.bad { background:rgba(255,64,96,.05); border-color:rgba(255,64,96,.15); }
+.safety-item:nth-child(1){animation-delay:.1s}
+.safety-item:nth-child(2){animation-delay:.25s}
+.safety-item:nth-child(3){animation-delay:.4s}
+.safety-item:nth-child(4){animation-delay:.55s}
+.safety-item:nth-child(5){animation-delay:.7s}
+.safety-icon { font-size:22px; }
+.safety-text { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--dim); max-width:180px; }
+
+/* END SCREEN */
+#end-screen {
+  position:fixed; top:0;left:0;width:100%;height:100%;
+  z-index:250; display:none; flex-direction:column;
+  align-items:center; justify-content:center;
+  background:rgba(4,8,16,.9);
+}
+#end-screen.show { display:flex; }
+#end-title { font-family:'Bebas Neue',sans-serif; font-size:clamp(32px,5vw,60px); color:var(--teal); letter-spacing:4px; text-align:center; }
+#end-sub { font-family:'Crimson Pro',serif; font-size:clamp(16px,2vw,22px); color:rgba(232,244,248,.7); text-align:center; margin-top:12px; max-width:600px; line-height:1.6; }
+#end-url { font-family:'Space Mono',monospace; font-size:12px; letter-spacing:3px; color:var(--gold); margin-top:20px; }
+.end-source { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:2px; color:rgba(232,244,248,.3); margin-top:6px; }
+#end-restart { margin-top:32px; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:5px; color:var(--teal); border:1px solid rgba(0,229,195,.3); padding:12px 32px; cursor:pointer; pointer-events:all; text-transform:uppercase; transition:background .3s; }
+#end-restart:hover { background:rgba(0,229,195,.1); }
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-ring"></div>
+<div class="scan"></div>
+<div class="cdc tl"></div>
+<div class="cdc br"></div>
+<div class="cdc tr"></div>
+<div class="cdc bl"></div>
+<div id="flash"></div>
+<div id="tooltip"></div>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen">
+  <div id="title-context">Fédération Wallonie-Bruxelles · Belgique 2025-2026</div>
+  <div id="big-title">LE<br>TÉTANOS</div>
+  <div id="title-sub">Comprendre la maladie, le vaccin et la protection</div>
+  <div id="title-deco"></div>
+  <div id="title-start">COMMENCER LA PRÉSENTATION ›</div>
+</div>
+
+<canvas id="world"></canvas>
+<div id="hud"></div>
+
+<div id="prog-bar" style="width:0%"></div>
+<div id="prog-text">01 / 13</div>
+<div id="chapter">INTRODUCTION</div>
+
+<div id="dots"></div>
+<div id="legend"></div>
+<div id="stats-overlay"></div>
+<div id="calendar-overlay"></div>
+<div id="safety-overlay"></div>
+
+<div id="scene-panel">
+  <div id="scene-tag"></div>
+  <div id="scene-title"></div>
+  <div id="scene-body"></div>
+</div>
+
+<div id="click-hint">CLIQUER POUR CONTINUER ›</div>
+
+<!-- END SCREEN -->
+<div id="end-screen">
+  <div id="end-title">VÉRIFIEZ VOS RAPPELS !</div>
+  <div id="end-sub">Le vaccin contre le tétanos est simple, efficace et indispensable tout au long de la vie. Un rappel tous les <strong style="color:var(--gold)">10 ans</strong> suffit à vous protéger.</div>
+  <div id="end-url">vaccination-info.be</div>
+  <div class="end-source">Sources : Sciensano · Conseil Supérieur de la Santé · OMS · vaccination-info.be</div>
+  <div id="end-restart">↺ RECOMMENCER</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ════════════════════════════════════════════════════════════
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d');
+let W, H, CX, CY;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  CX = W/2; CY = H/2;
+}
+resize();
+window.addEventListener('resize', () => { resize(); if(!titleVisible) buildScene(current); });
+
+// ════════════════════════════════════════════════════════════
+// CURSOR
+// ════════════════════════════════════════════════════════════
+const cur = document.getElementById('cur');
+const curR = document.getElementById('cur-ring');
+let mx=CX, my=CY, rx=CX, ry=CY;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; cur.style.left=mx+'px'; cur.style.top=my+'px'; });
+setInterval(()=>{ rx+=(mx-rx)*.1; ry+=(my-ry)*.1; curR.style.left=rx+'px'; curR.style.top=ry+'px'; },16);
+document.addEventListener('mousedown',()=>cur.style.transform='translate(-50%,-50%) scale(1.8)');
+document.addEventListener('mouseup',()=>cur.style.transform='translate(-50%,-50%) scale(1)');
+
+// ════════════════════════════════════════════════════════════
+// MATH HELPERS
+// ════════════════════════════════════════════════════════════
+const PI2 = Math.PI*2;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const randInt=(a,b)=>Math.floor(rand(a,b+1));
+const dist=(x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const easeOut=(t)=>1-(1-t)**3;
+const easeInOut=(t)=>t<.5?4*t**3:1-(-2*t+2)**3/2;
+
+// ════════════════════════════════════════════════════════════
+// GLOBALS
+// ════════════════════════════════════════════════════════════
+let sceneObjects=[], beams=[], fieldParticles=[], t=0;
+let current=0, animating=false, titleVisible=true;
+const TOTAL=13;
+
+// Init field particles
+for(let i=0;i<80;i++) fieldParticles.push(new FieldParticle());
+
+// ════════════════════════════════════════════════════════════
+// ATOM CLASS
+// ════════════════════════════════════════════════════════════
+function Atom(opts={}) {
+  this.x = opts.x || CX;
+  this.y = opts.y || CY;
+  this.tx = this.x; this.ty = this.y;
+  this.vx = opts.vx || rand(-1,1);
+  this.vy = opts.vy || rand(-1,1);
+  this.r = opts.r || rand(8,18);
+  this.baseR = this.r;
+  this.color = opts.color || '#00e5c3';
+  this.label = opts.label || '';
+  this.shell = opts.shell || 0;
+  this.electrons = [];
+  this.orbitSpeed = opts.orbitSpeed || rand(.4,1.2);
+  this.orbitAngle = rand(0,PI2);
+  this.alpha = opts.alpha !== undefined ? opts.alpha : 1;
+  this.targetAlpha = this.alpha;
+  this.glow = opts.glow !== undefined ? opts.glow : 1;
+  this.pulse = 0;
+  this.pulseDir = 1;
+  this.fixed = opts.fixed || false;
+  this.bonds = [];
+  this.highlighted = false;
+  this.spinAngle = 0;
+  this.wobble = opts.wobble || 0;
+  this.wobbleFreq = rand(.5,2);
+  this.wobblePhase = rand(0,PI2);
+  this.id = opts.id || Math.random();
+  this.type = opts.type || 'atom';
+  this.hovered = false;
+  this.dead = false;
+
+  for(let s=0;s<this.shell;s++) {
+    const count = [2,8,8][s]||4;
+    const used = Math.min(count, Math.ceil(count * (.3+Math.random()*.7)));
+    for(let e=0;e<used;e++) {
+      this.electrons.push({
+        shell: s,
+        angle: (e/used)*PI2,
+        speed: (1.5-s*.3)*this.orbitSpeed*(Math.random()>.5?1:-1),
+        r: this.r*(1.8+s*.8),
+        er: rand(2,3.5)
+      });
+    }
+  }
+}
+Atom.prototype.update = function(dt, t) {
+  if(!this.fixed) {
+    this.vx *= 0.985; this.vy *= 0.985;
+    const dx=this.tx-this.x, dy=this.ty-this.y;
+    const d=Math.hypot(dx,dy);
+    if(d>1) { this.vx+=dx*.025; this.vy+=dy*.025; }
+    this.x+=this.vx*dt; this.y+=this.vy*dt;
+  }
+  if(this.wobble>0) {
+    this.x+=Math.sin(t*this.wobbleFreq+this.wobblePhase)*this.wobble*.3;
+    this.y+=Math.cos(t*this.wobbleFreq*1.3+this.wobblePhase)*this.wobble*.2;
+  }
+  this.spinAngle+=.008*dt;
+  for(const e of this.electrons) { e.angle += e.speed*dt*.05; }
+  this.pulse+=this.pulseDir*.05*dt;
+  if(this.pulse>1||this.pulse<0) this.pulseDir*=-1;
+  this.pulse=clamp(this.pulse,0,1);
+  this.alpha=lerp(this.alpha,this.targetAlpha,.08*dt);
+  this.r=this.baseR+(this.highlighted?2:0)+(this.hovered?3:0);
+};
+Atom.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha = this.alpha;
+  if(this.glow>0) {
+    const g=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.r*(2.5+this.pulse*.5));
+    const c=hexToRgb(this.color);
+    g.addColorStop(0,`rgba(${c},${.25*this.glow*(1+this.pulse*.3)})`);
+    g.addColorStop(1,`rgba(${c},0)`);
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r*(2.5+this.pulse*.5),0,PI2); ctx.fill();
+  }
+  for(let s=0;s<this.shell;s++) {
+    const sr=this.r*(1.8+s*.8);
+    ctx.strokeStyle=this.color; ctx.globalAlpha=this.alpha*.12; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.ellipse(this.x,this.y,sr,sr*.35,this.spinAngle+s*.5,0,PI2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(this.x,this.y,sr,sr*.35,this.spinAngle+s*.5+Math.PI*.5,0,PI2); ctx.stroke();
+    ctx.globalAlpha=this.alpha;
+  }
+  for(const e of this.electrons) {
+    const ex=this.x+Math.cos(e.angle)*e.r*Math.cos(this.spinAngle+e.shell*.5)-Math.sin(e.angle)*e.r*.35*Math.sin(this.spinAngle+e.shell*.5);
+    const ey=this.y+Math.cos(e.angle)*e.r*.35*Math.sin(this.spinAngle+e.shell*.5)+Math.sin(e.angle)*e.r*Math.cos(this.spinAngle+e.shell*.5);
+    ctx.globalAlpha=this.alpha*.8;
+    const eg=ctx.createRadialGradient(ex,ey,0,ex,ey,e.er*2.5);
+    const c2=hexToRgb(this.color);
+    eg.addColorStop(0,`rgba(${c2},.9)`); eg.addColorStop(1,`rgba(${c2},0)`);
+    ctx.fillStyle=eg; ctx.beginPath(); ctx.arc(ex,ey,e.er*2.5,0,PI2); ctx.fill();
+    ctx.fillStyle=this.color; ctx.globalAlpha=this.alpha;
+    ctx.beginPath(); ctx.arc(ex,ey,e.er,0,PI2); ctx.fill();
+  }
+  const grad=ctx.createRadialGradient(this.x-this.r*.3,this.y-this.r*.3,0,this.x,this.y,this.r);
+  const c=hexToRgb(this.color);
+  grad.addColorStop(0,`rgba(${c},.95)`); grad.addColorStop(.5,`rgba(${c},.8)`); grad.addColorStop(1,`rgba(${c},.4)`);
+  ctx.fillStyle=grad; ctx.globalAlpha=this.alpha;
+  ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,PI2); ctx.fill();
+  if(this.highlighted||this.hovered) {
+    ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+    ctx.globalAlpha=this.alpha*(this.hovered?.9:.5);
+    ctx.beginPath(); ctx.arc(this.x,this.y,this.r+4+this.pulse*3,0,PI2); ctx.stroke();
+  }
+  if(this.label) {
+    ctx.fillStyle='#040810'; ctx.globalAlpha=this.alpha;
+    ctx.font=`bold ${Math.max(8,this.r*.55)}px Space Mono, monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(this.label,this.x,this.y);
+  }
+  ctx.restore();
+};
+Atom.prototype.drawBonds = function() {
+  for(const b of this.bonds) {
+    if(b.id > this.id) continue;
+    const dx=b.x-this.x, dy=b.y-this.y;
+    const d=Math.hypot(dx,dy);
+    if(d>300) continue;
+    const alpha=Math.min(this.alpha,b.alpha)*clamp(1-d/250,.1,1);
+    ctx.save(); ctx.globalAlpha=alpha*.35; ctx.strokeStyle=this.color;
+    ctx.lineWidth=1; ctx.setLineDash([4,6]);
+    ctx.lineDashOffset=-Date.now()*.01;
+    ctx.beginPath(); ctx.moveTo(this.x,this.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    ctx.restore();
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+// FIELD PARTICLES
+// ════════════════════════════════════════════════════════════
+function FieldParticle() { this.reset(); }
+FieldParticle.prototype.reset = function() {
+  this.x=rand(0,W); this.y=rand(0,H);
+  this.vx=rand(-.3,.3); this.vy=rand(-.3,.3);
+  this.r=rand(.5,2); this.alpha=rand(.05,.25);
+  this.color=Math.random()>.6?'#00e5c3':'#2a4a6a';
+};
+FieldParticle.prototype.update = function() {
+  this.x+=this.vx; this.y+=this.vy;
+  if(this.x<0||this.x>W||this.y<0||this.y>H) this.reset();
+};
+FieldParticle.prototype.draw = function() {
+  ctx.fillStyle=this.color; ctx.globalAlpha=this.alpha;
+  ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,PI2); ctx.fill();
+  ctx.globalAlpha=1;
+};
+
+// ════════════════════════════════════════════════════════════
+// MOLECULE
+// ════════════════════════════════════════════════════════════
+function Molecule(x, y, atoms, opts={}) {
+  this.x=x; this.y=y; this.atoms=atoms;
+  this.vx=opts.vx||0; this.vy=opts.vy||0;
+  this.spin=opts.spin||0; this.angle=opts.angle||0;
+  this.alpha=opts.alpha||1; this.dead=false;
+}
+Molecule.prototype.update = function(dt,t) {
+  this.angle+=this.spin*dt*.02;
+  this.vx*=.99; this.vy*=.99;
+  this.x+=this.vx*dt; this.y+=this.vy*dt;
+  if(this.x<100||this.x>W-100) this.vx*=-1;
+  if(this.y<120||this.y>H-120) this.vy*=-1;
+  for(const a of this.atoms) {
+    const rx=Math.cos(this.angle)*a.ox-Math.sin(this.angle)*a.oy;
+    const ry=Math.sin(this.angle)*a.ox+Math.cos(this.angle)*a.oy;
+    a.tx=this.x+rx; a.ty=this.y+ry;
+    a.targetAlpha=this.alpha; a.update(dt,t);
+  }
+};
+Molecule.prototype.draw = function(t) {
+  for(let i=0;i<this.atoms.length;i++) {
+    for(let j=i+1;j<this.atoms.length;j++) {
+      const a=this.atoms[i], b=this.atoms[j];
+      const d=dist(a.x,a.y,b.x,b.y);
+      if(d<120) {
+        const alpha=Math.min(a.alpha,b.alpha)*clamp(1-d/120,.2,1);
+        ctx.save(); ctx.globalAlpha=alpha*.6; ctx.strokeStyle=a.color;
+        ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+  for(const a of this.atoms) a.draw(t);
+};
+
+// ════════════════════════════════════════════════════════════
+// SPORE
+// ════════════════════════════════════════════════════════════
+function Spore(x, y, opts={}) {
+  this.x=x; this.y=y; this.tx=x; this.ty=y;
+  this.vx=opts.vx||rand(-1.5,1.5); this.vy=opts.vy||rand(-1,1);
+  this.angle=rand(0,PI2); this.spin=rand(-.02,.02);
+  this.w=opts.w||rand(40,70); this.h=this.w*.28;
+  this.color=opts.color||'#ff4060';
+  this.alpha=opts.alpha||0; this.targetAlpha=1;
+  this.sporeR=this.h*1.3; this.flagellaPhase=rand(0,PI2);
+  this.dead=false; this.highlighted=false; this.id=Math.random();
+  this.label=opts.label||''; this.exploding=false; this.explodeT=0;
+}
+Spore.prototype.update = function(dt,t) {
+  if(this.exploding) {
+    this.explodeT+=dt*.04;
+    this.alpha=lerp(this.alpha,0,.08*dt);
+    if(this.explodeT>1) this.dead=true; return;
+  }
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  this.vx*=.98; this.vy*=.98;
+  const dx=this.tx-this.x, dy=this.ty-this.y;
+  this.vx+=dx*.012; this.vy+=dy*.012;
+  this.x+=this.vx*dt; this.y+=this.vy*dt;
+  this.angle+=this.spin*dt; this.flagellaPhase+=dt*.04;
+  if(this.x<80||this.x>W-80) this.vx*=-1;
+  if(this.y<140||this.y>H-140) this.vy*=-1;
+};
+Spore.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+  const g=ctx.createRadialGradient(0,0,0,0,0,this.w*.9);
+  g.addColorStop(0,`rgba(255,64,96,${.25*(this.highlighted?1.5:1)})`);
+  g.addColorStop(1,'rgba(255,64,96,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.ellipse(0,0,this.w*.9,this.h*2.5,0,0,PI2); ctx.fill();
+  ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+  ctx.fillStyle=`rgba(255,64,96,.12)`;
+  ctx.beginPath(); ctx.ellipse(0,0,this.w,this.h,0,0,PI2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=`rgba(255,64,96,.25)`; ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(this.w+this.sporeR*.3,0,this.sporeR,0,PI2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle=`rgba(255,64,96,.3)`; ctx.lineWidth=.8;
+  for(let i=0;i<4;i++) {
+    const px=rand(-this.w*.5,this.w*.5);
+    ctx.beginPath(); ctx.moveTo(px,-this.h*.5); ctx.lineTo(px+rand(-8,8),this.h*.5); ctx.stroke();
+  }
+  ctx.strokeStyle=`rgba(255,64,96,.5)`; ctx.lineWidth=1; ctx.setLineDash([]);
+  for(let f=0;f<3;f++) {
+    const fy=lerp(-this.h*.5,this.h*.5,f/2);
+    ctx.beginPath(); ctx.moveTo(-this.w, fy);
+    for(let i=0;i<8;i++) {
+      const fx=-this.w-(i+1)*12;
+      const fwave=Math.sin(this.flagellaPhase+i*.7+f)*8;
+      ctx.lineTo(fx, fy+fwave);
+    }
+    ctx.stroke();
+  }
+  if(this.label) {
+    ctx.rotate(-this.angle); ctx.fillStyle=this.color;
+    ctx.font='bold 10px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(this.label,0,-this.h-8); ctx.rotate(this.angle);
+  }
+  ctx.restore();
+  if(this.exploding) {
+    const ep=easeOut(this.explodeT);
+    for(let i=0;i<8;i++) {
+      const ea=i/8*PI2; const er=ep*60;
+      const ex2=this.x+Math.cos(ea)*er, ey2=this.y+Math.sin(ea)*er;
+      ctx.save(); ctx.globalAlpha=(1-ep)*.6; ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(this.x+Math.cos(ea)*this.w*.3,this.y+Math.sin(ea)*this.w*.3);
+      ctx.lineTo(ex2,ey2); ctx.stroke(); ctx.restore();
+    }
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+// TOXIN MOLECULE
+// ════════════════════════════════════════════════════════════
+function ToxinMolecule(x, y, opts={}) {
+  this.x=x; this.y=y; this.tx=x; this.ty=y;
+  this.vx=rand(-2,2); this.vy=rand(-2,2);
+  this.size=opts.size||rand(16,28);
+  this.alpha=opts.alpha||0; this.targetAlpha=opts.targetAlpha||1;
+  this.angle=rand(0,PI2); this.spin=rand(-.015,.015);
+  this.color=opts.color||'#aa66ff';
+  this.dead=false; this.neutralized=false; this.neutralizeT=0;
+  this.id=Math.random(); this.type='toxin';
+  this.phase=rand(0,PI2); this.label=opts.label||'';
+}
+ToxinMolecule.prototype.update = function(dt,t) {
+  if(this.neutralized) {
+    this.neutralizeT+=dt*.03;
+    this.alpha=lerp(this.alpha,0,.06*dt);
+    if(this.neutralizeT>1) this.dead=true; return;
+  }
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  this.vx*=.97; this.vy*=.97;
+  const dx=this.tx-this.x, dy=this.ty-this.y;
+  this.vx+=dx*.018; this.vy+=dy*.018;
+  this.x+=this.vx*dt; this.y+=this.vy*dt;
+  this.angle+=this.spin*dt; this.phase+=dt*.06;
+  if(this.x<80||this.x>W-80) this.vx*=-1;
+  if(this.y<140||this.y>H-140) this.vy*=-1;
+};
+ToxinMolecule.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  ctx.translate(this.x,this.y); ctx.rotate(this.angle+Math.sin(this.phase)*.1);
+  const s=this.size;
+  const gg=ctx.createRadialGradient(0,0,0,0,0,s*2.5);
+  gg.addColorStop(0,`rgba(170,102,255,.3)`); gg.addColorStop(1,'rgba(170,102,255,0)');
+  ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(0,0,s*2.5,0,PI2); ctx.fill();
+  const spikes=7; ctx.beginPath();
+  for(let i=0;i<spikes*2;i++) {
+    const r2=i%2===0?s:s*.45;
+    const a=i/spikes/2*PI2-Math.PI/2;
+    i===0?ctx.moveTo(Math.cos(a)*r2,Math.sin(a)*r2):ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2);
+  }
+  ctx.closePath();
+  ctx.fillStyle=`rgba(170,102,255,.2)`; ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(0,0,s*.3,0,PI2); ctx.fill();
+  for(let i=0;i<3;i++) {
+    const ra=i/3*PI2+this.angle*.5;
+    ctx.fillStyle='rgba(255,64,96,.8)';
+    ctx.beginPath(); ctx.arc(Math.cos(ra)*s*.7,Math.sin(ra)*s*.7,3,0,PI2); ctx.fill();
+  }
+  if(this.neutralized) {
+    ctx.strokeStyle='#00e5c3'; ctx.lineWidth=2;
+    const np=easeOut(this.neutralizeT);
+    ctx.beginPath(); ctx.arc(0,0,s*(1+np*.8),0,PI2*np); ctx.stroke();
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// ANTIBODY
+// ════════════════════════════════════════════════════════════
+function Antibody(x, y, opts={}) {
+  this.x=x; this.y=y; this.tx=x; this.ty=y;
+  this.vx=rand(-1.5,1.5); this.vy=rand(-1.5,1.5);
+  this.angle=rand(0,PI2); this.spin=rand(-.01,.01);
+  this.size=opts.size||rand(20,32);
+  this.alpha=opts.alpha||0; this.targetAlpha=1;
+  this.color=opts.color||'#00e5c3';
+  this.dead=false; this.target=null; this.phase=rand(0,PI2);
+  this.id=Math.random(); this.type='antibody';
+  this.attacking=false; this.attackT=0; this.locked=false;
+}
+Antibody.prototype.update = function(dt,t) {
+  if(this.dead) return;
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  this.vx*=.97; this.vy*=.97;
+  if(this.target && !this.target.dead) {
+    const dx=this.target.x-this.x, dy=this.target.y-this.y;
+    const d=Math.hypot(dx,dy);
+    if(d<30&&!this.locked) { this.locked=true; this.target.neutralized=true; this.attacking=true; }
+    if(!this.locked) { this.vx+=dx/d*.08*dt; this.vy+=dy/d*.08*dt; }
+    if(this.attacking) {
+      this.attackT+=dt*.04;
+      this.alpha=lerp(this.alpha,0,.05*dt);
+      if(this.attackT>1) this.dead=true;
+    }
+  }
+  const dx=this.tx-this.x, dy=this.ty-this.y;
+  if(!this.target||this.target.dead&&!this.locked) { this.vx+=dx*.015; this.vy+=dy*.015; }
+  this.x+=this.vx*dt; this.y+=this.vy*dt;
+  this.angle+=this.spin*dt; this.phase+=dt*.05;
+  if(this.x<80||this.x>W-80) this.vx*=-1;
+  if(this.y<140||this.y>H-140) this.vy*=-1;
+};
+Antibody.prototype.draw = function(t) {
+  if(this.alpha<.01||this.dead) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  ctx.translate(this.x,this.y); ctx.rotate(this.angle+Math.sin(this.phase)*.08);
+  const s=this.size;
+  const gg=ctx.createRadialGradient(0,0,0,0,0,s*2);
+  gg.addColorStop(0,'rgba(0,229,195,.25)'); gg.addColorStop(1,'rgba(0,229,195,0)');
+  ctx.fillStyle=gg; ctx.beginPath(); ctx.arc(0,0,s*2,0,PI2); ctx.fill();
+  ctx.strokeStyle=this.color; ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(0,s*.8); ctx.lineTo(0,-s*.1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,-s*.1); ctx.lineTo(-s*.6,-s*.9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,-s*.1); ctx.lineTo(s*.6,-s*.9); ctx.stroke();
+  ctx.fillStyle=this.color;
+  ctx.beginPath(); ctx.arc(-s*.6,-s*.9,s*.18,0,PI2); ctx.fill();
+  ctx.beginPath(); ctx.arc(s*.6,-s*.9,s*.18,0,PI2); ctx.fill();
+  ctx.fillStyle='rgba(0,229,195,.6)'; ctx.beginPath(); ctx.arc(0,s*.8,s*.14,0,PI2); ctx.fill();
+  if(this.attacking) {
+    ctx.strokeStyle='#ffcc44'; ctx.lineWidth=2;
+    ctx.globalAlpha=this.alpha*(1-this.attackT);
+    ctx.beginPath(); ctx.arc(0,0,s*(1+this.attackT*1.5),0,PI2); ctx.stroke();
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// NERVE CELL
+// ════════════════════════════════════════════════════════════
+function NerveCell(x,y,opts={}) {
+  this.x=x; this.y=y; this.color=opts.color||'#4488ff';
+  this.alpha=opts.alpha||0; this.targetAlpha=1;
+  this.signalT=0; this.signalActive=opts.signalActive!==undefined?opts.signalActive:true;
+  this.label=opts.label||''; this.blocked=opts.blocked||false;
+  this.w=opts.w||120; this.h=opts.h||220; this.id=Math.random();
+}
+NerveCell.prototype.update = function(dt,t) {
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  if(this.signalActive&&!this.blocked) this.signalT=(this.signalT+dt*.012)%1;
+};
+NerveCell.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  const x=this.x,y=this.y;
+  ctx.strokeStyle=this.color; ctx.lineWidth=this.w*.18; ctx.lineCap='round';
+  ctx.globalAlpha=this.alpha*.4;
+  ctx.beginPath(); ctx.moveTo(x,y+this.h*.5); ctx.lineTo(x,y-this.h*.45); ctx.stroke();
+  ctx.globalAlpha=this.alpha*.6;
+  for(let i=0;i<5;i++) {
+    const sy=y+this.h*.5-i*(this.h*.18);
+    ctx.fillStyle=this.color;
+    ctx.fillRect(x-this.w*.2,sy-this.h*.07,this.w*.4,this.h*.06);
+  }
+  ctx.globalAlpha=this.alpha;
+  const sg=ctx.createRadialGradient(x,y-this.h*.45,0,x,y-this.h*.45,this.w*.45);
+  sg.addColorStop(0,`rgba(68,136,255,.8)`); sg.addColorStop(1,`rgba(68,136,255,.1)`);
+  ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(x,y-this.h*.45,this.w*.45,0,PI2); ctx.fill();
+  ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,y-this.h*.45,this.w*.45,0,PI2); ctx.stroke();
+  ctx.fillStyle='rgba(68,136,255,.5)';
+  ctx.beginPath(); ctx.arc(x,y-this.h*.45,this.w*.2,0,PI2); ctx.fill();
+  ctx.strokeStyle=this.color; ctx.lineWidth=1.5; ctx.setLineDash([]);
+  for(let d=0;d<5;d++) {
+    const da=(d/5-0.5)*1.8;
+    ctx.globalAlpha=this.alpha*.5; ctx.beginPath();
+    ctx.moveTo(x,y-this.h*.45);
+    ctx.bezierCurveTo(x+Math.sin(da)*40,y-this.h*.6,x+Math.sin(da)*60,y-this.h*.8,x+Math.sin(da)*50,y-this.h*.9);
+    ctx.stroke();
+  }
+  if(this.signalActive&&!this.blocked) {
+    const sy=lerp(y+this.h*.5,y-this.h*.4,this.signalT);
+    ctx.globalAlpha=this.alpha*.9;
+    const sg2=ctx.createRadialGradient(x,sy,0,x,sy,this.w*.3);
+    sg2.addColorStop(0,'rgba(255,204,68,.9)'); sg2.addColorStop(1,'rgba(255,204,68,0)');
+    ctx.fillStyle=sg2; ctx.beginPath(); ctx.arc(x,sy,this.w*.3,0,PI2); ctx.fill();
+    ctx.fillStyle='#ffcc44'; ctx.beginPath(); ctx.arc(x,sy,this.w*.09,0,PI2); ctx.fill();
+  }
+  if(this.blocked) {
+    ctx.globalAlpha=this.alpha; ctx.strokeStyle='#ff4060'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(x-this.w*.3,y); ctx.lineTo(x+this.w*.3,y); ctx.stroke();
+    ctx.moveTo(x-this.w*.3+this.w*.1,y-this.w*.2);
+    ctx.lineTo(x+this.w*.3-this.w*.1,y+this.w*.2); ctx.stroke();
+    ctx.fillStyle='rgba(170,102,255,.6)'; ctx.beginPath(); ctx.arc(x,y,this.w*.25,0,PI2); ctx.fill();
+    ctx.strokeStyle='#aa66ff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,this.w*.25,0,PI2); ctx.stroke();
+  }
+  if(this.label) {
+    ctx.globalAlpha=this.alpha; ctx.fillStyle=this.color;
+    ctx.font='10px Space Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ctx.fillText(this.label,x,y+this.h*.55);
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// PROCESSING BEAM
+// ════════════════════════════════════════════════════════════
+function ProcessingBeam(x1,y1,x2,y2,opts={}) {
+  this.x1=x1; this.y1=y1; this.x2=x2; this.y2=y2;
+  this.alpha=opts.alpha||0; this.targetAlpha=1;
+  this.t=0; this.color=opts.color||'#ffcc44';
+  this.width=opts.width||3; this.active=true;
+}
+ProcessingBeam.prototype.update = function(dt) {
+  this.alpha=lerp(this.alpha,this.targetAlpha,.06*dt);
+  if(this.active) this.t=(this.t+dt*.015)%1;
+};
+ProcessingBeam.prototype.draw = function() {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha*.4;
+  ctx.strokeStyle=this.color; ctx.lineWidth=this.width;
+  ctx.setLineDash([8,6]); ctx.lineDashOffset=-this.t*80;
+  ctx.beginPath(); ctx.moveTo(this.x1,this.y1); ctx.lineTo(this.x2,this.y2); ctx.stroke();
+  const prog=easeInOut(this.t);
+  const px=lerp(this.x1,this.x2,prog), py=lerp(this.y1,this.y2,prog);
+  ctx.globalAlpha=this.alpha;
+  const g=ctx.createRadialGradient(px,py,0,px,py,12);
+  g.addColorStop(0,this.color); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,12,0,PI2); ctx.fill();
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// WOUND / ENTRY POINT
+// ════════════════════════════════════════════════════════════
+function WoundEffect(x,y,opts={}) {
+  this.x=x; this.y=y; this.alpha=0; this.targetAlpha=1;
+  this.t=0; this.pulse=0; this.id=Math.random(); this.dead=false;
+  this.r=opts.r||40; this.label=opts.label||'';
+}
+WoundEffect.prototype.update = function(dt,t) {
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  this.t+=dt*.03; this.pulse=(Math.sin(this.t*2)+1)/2;
+};
+WoundEffect.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  // Outer pulse ring
+  ctx.strokeStyle='#ff4060'; ctx.lineWidth=1.5;
+  ctx.globalAlpha=this.alpha*(1-this.pulse)*.6;
+  ctx.beginPath(); ctx.arc(this.x,this.y,this.r*(1+this.pulse*.5),0,PI2); ctx.stroke();
+  // Wound shape (irregular)
+  ctx.globalAlpha=this.alpha;
+  const wg=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,this.r);
+  wg.addColorStop(0,'rgba(255,64,96,.4)');
+  wg.addColorStop(.6,'rgba(255,64,96,.15)');
+  wg.addColorStop(1,'rgba(255,64,96,0)');
+  ctx.fillStyle=wg; ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,PI2); ctx.fill();
+  // Wound lines
+  ctx.strokeStyle='rgba(255,64,96,.8)'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.moveTo(this.x-this.r*.4,this.y-this.r*.1);
+  ctx.bezierCurveTo(this.x-this.r*.1,this.y+this.r*.2,this.x+this.r*.1,this.y-this.r*.2,this.x+this.r*.4,this.y+this.r*.1);
+  ctx.stroke();
+  if(this.label) {
+    ctx.fillStyle='#ff4060'; ctx.font='bold 10px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(this.label,this.x,this.y-this.r-6);
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// SYRINGE
+// ════════════════════════════════════════════════════════════
+function Syringe(x,y,opts={}) {
+  this.x=x; this.y=y; this.alpha=0; this.targetAlpha=1;
+  this.angle=opts.angle||Math.PI*.25; this.id=Math.random(); this.dead=false;
+  this.injectT=0; this.injecting=true; this.color=opts.color||'#00e5c3';
+}
+Syringe.prototype.update = function(dt,t) {
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  if(this.injecting) this.injectT=Math.min(1,this.injectT+dt*.008);
+};
+Syringe.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  ctx.translate(this.x,this.y); ctx.rotate(this.angle);
+  const len=80, w=16;
+  // Body
+  ctx.strokeStyle='rgba(232,244,248,.6)'; ctx.lineWidth=1;
+  ctx.fillStyle='rgba(232,244,248,.08)';
+  ctx.beginPath(); ctx.rect(-len*.5,-w*.5,len,w); ctx.fill(); ctx.stroke();
+  // Plunger (shows injection progress)
+  const fill=(1-this.injectT)*len*.7;
+  ctx.fillStyle=`rgba(${hexToRgb(this.color)},.3)`;
+  ctx.fillRect(-len*.5+4,-w*.4+2,fill,w*.8-4);
+  // Needle
+  ctx.strokeStyle='rgba(232,244,248,.8)'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(len*.5,0); ctx.lineTo(len*.5+30,0); ctx.stroke();
+  // Drop
+  if(this.injectT>0.3) {
+    ctx.fillStyle=this.color; ctx.globalAlpha=this.alpha*(this.injectT-.3)/.7;
+    ctx.beginPath(); ctx.arc(len*.5+32,6,4,0,PI2); ctx.fill();
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// MUSCLE FIBER
+// ════════════════════════════════════════════════════════════
+function MuscleFiber(x,y,opts={}) {
+  this.x=x; this.y=y; this.w=opts.w||200; this.h=opts.h||20;
+  this.alpha=0; this.targetAlpha=1; this.spasm=opts.spasm||false;
+  this.t=rand(0,PI2); this.id=Math.random(); this.dead=false;
+  this.color=opts.color||'#ff4060'; this.label=opts.label||'';
+}
+MuscleFiber.prototype.update = function(dt,tg) {
+  this.alpha=lerp(this.alpha,this.targetAlpha,.04*dt);
+  this.t+=dt*(this.spasm?.08:.02);
+};
+MuscleFiber.prototype.draw = function(t) {
+  if(this.alpha<.01) return;
+  ctx.save(); ctx.globalAlpha=this.alpha;
+  const contraction=this.spasm?Math.sin(this.t)*0.3+0.3:Math.sin(this.t)*.05;
+  const w=this.w*(1-contraction*.2), h=this.h*(1+contraction*.8);
+  ctx.fillStyle=`rgba(${hexToRgb(this.color)},.15)`;
+  ctx.strokeStyle=this.color; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.ellipse(this.x,this.y,w*.5,h*.5,0,0,PI2);
+  ctx.fill(); ctx.stroke();
+  // Striations
+  ctx.strokeStyle=`rgba(${hexToRgb(this.color)},.4)`; ctx.lineWidth=.8;
+  const stripes=12;
+  for(let i=0;i<stripes;i++) {
+    const sx=this.x-w*.5+(i/stripes)*w;
+    const jitter=contraction*rand(-8,8);
+    ctx.beginPath(); ctx.moveTo(sx,this.y-h*.5+jitter); ctx.lineTo(sx+rand(-3,3),this.y+h*.5+jitter); ctx.stroke();
+  }
+  if(this.label) {
+    ctx.fillStyle=this.color; ctx.font='10px Space Mono,monospace';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(this.label,this.x,this.y-h*.5-8);
+  }
+  ctx.restore();
+};
+
+// ════════════════════════════════════════════════════════════
+// STAT COUNTER (animated number)
+// ════════════════════════════════════════════════════════════
+function drawCounterText(el, target, duration, suffix='', color='var(--teal)') {
+  let start=null, from=0;
+  function step(ts) {
+    if(!start) start=ts;
+    const p=Math.min((ts-start)/duration,1);
+    const val=Math.round(easeOut(p)*(target-from)+from);
+    el.innerHTML=`<span style="color:${color};font-family:'Bebas Neue',sans-serif;font-size:56px">${val}${suffix}</span>`;
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ════════════════════════════════════════════════════════════
+// GRID BACKGROUND
+// ════════════════════════════════════════════════════════════
+function drawGrid(alpha=.05) {
+  ctx.save(); ctx.globalAlpha=alpha;
+  ctx.strokeStyle='#1a3344'; ctx.lineWidth=.5;
+  const gs=60;
+  for(let x=0;x<W;x+=gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<H;y+=gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // Center radial glow
+  const rg=ctx.createRadialGradient(CX,CY,0,CX,CY,Math.max(W,H)*.6);
+  rg.addColorStop(0,'rgba(0,229,195,.04)'); rg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.globalAlpha=1; ctx.fillStyle=rg;
+  ctx.beginPath(); ctx.rect(0,0,W,H); ctx.fill();
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════════════════════
+// SCENES — 13 scenes total
+// ════════════════════════════════════════════════════════════
+const SCENES = [
+
+  // 0: INTRODUCTION
+  {
+    chapter:'INTRODUCTION',
+    tag:'00 — Contexte belge',
+    title:'UNE MALADIE\nMORTELLE',
+    body:'Saviez-vous qu\'une <strong>blessure banale</strong> peut causer la mort ? Le tétanos, pourtant évitable, tue encore des personnes <em>non vaccinées</em> dans le monde. En Belgique, grâce à la vaccination, il est devenu exceptionnel — mais le risque <span class="red">persiste</span> pour les personnes sans rappel à jour.',
+    build(W,H) {
+      const objs=[];
+      // Central warning atom
+      const center=new Atom({x:CX,y:CY-40,r:50,color:'#ff4060',label:'!',shell:2,wobble:3,glow:1.5});
+      center.tx=CX; center.ty=CY-40; center.targetAlpha=1;
+      objs.push(center);
+      // Small spores drifting in
+      for(let i=0;i<5;i++) {
+        const s=new Spore(rand(W*.1,W*.9),rand(H*.2,H*.8),{w:rand(30,55)});
+        s.tx=rand(W*.15,W*.85); s.ty=rand(H*.25,H*.75);
+        objs.push(s);
+      }
+      // Teal atoms orbit
+      for(let i=0;i<8;i++) {
+        const a=new Atom({x:rand(0,W),y:rand(100,H-200),r:rand(4,10),color:i%2?'#00e5c3':'#4488ff',shell:0,wobble:rand(3,8)});
+        a.targetAlpha=rand(.3,.8); a.alpha=0;
+        objs.push(a);
+      }
+      return objs;
+    }
+  },
+
+  // 1: WHAT IS TETANUS — Clostridium tetani
+  {
+    chapter:'LA BACTÉRIE',
+    tag:'01 — Clostridium tetani',
+    title:'LA BACTÉRIE\nKILLER',
+    body:'<em>Clostridium tetani</em> est une bactérie anaérobie sporulée. Ses <strong>spores</strong> résistent des décennies dans le sol, la poussière et les excréments d\'animaux. Elles entrent dans l\'organisme par une plaie, même petite — <span class="red">piqûre de rose, écorchure, brûlure.</span>',
+    build(W,H) {
+      const objs=[];
+      for(let i=0;i<7;i++) {
+        const s=new Spore(rand(W*.15,W*.85),rand(H*.2,H*.75),{vx:rand(-1.5,1.5),vy:rand(-1,1),w:rand(50,80),label:i===0?'C. tetani':''});
+        s.tx=rand(W*.2,W*.8); s.ty=rand(H*.25,H*.7);
+        objs.push(s);
+      }
+      for(let i=0;i<20;i++) {
+        const a=new Atom({x:rand(0,W),y:rand(100,H-100),r:rand(3,8),color:'#ff4060',shell:0,wobble:4});
+        a.targetAlpha=rand(.2,.6); a.alpha=0; objs.push(a);
+      }
+      // Wound entry point
+      const w=new WoundEffect(W*.75,H*.45,{r:35,label:'PLAIE'});
+      objs.push(w);
+      return objs;
+    }
+  },
+
+  // 2: TOXIN
+  {
+    chapter:'LA TOXINE',
+    tag:'02 — Tétanospasmine 150 kDa',
+    title:'LA TOXINE\nNEUROLOGIQUE',
+    body:'La <strong>tétanospasmine</strong> — 150 000 daltons — est l\'une des toxines les plus puissantes connues. Elle se fixe de façon <em>irréversible</em> sur les terminaisons nerveuses et <strong>bloque la libération du GABA</strong>, l\'inhibiteur naturel des contractions. Incubation : <span class="gold">3 à 21 jours.</span>',
+    build(W,H) {
+      const objs=[];
+      for(let i=0;i<10;i++) {
+        const tx=new ToxinMolecule(rand(W*.1,W*.9),rand(H*.2,H*.8),{size:rand(18,32)});
+        tx.tx=rand(W*.1,W*.9); tx.ty=rand(H*.2,H*.8);
+        if(i===0) tx.label='Tétanospasmine';
+        objs.push(tx);
+      }
+      const n1=new NerveCell(W*.3,H*.5,{w:60,h:180,blocked:true,label:'Neurone moteur',color:'#4488ff'});
+      const n2=new NerveCell(W*.7,H*.5,{w:60,h:180,blocked:true,label:'Interneurone',color:'#4488ff'});
+      objs.push(n1,n2);
+      return objs;
+    }
+  },
+
+  // 3: SYMPTOMS
+  {
+    chapter:'SYMPTÔMES',
+    tag:'03 — Trismus & spasmes',
+    title:'SPASMES\nMUSCULAIRES',
+    body:'Après l\'incubation : <strong>trismus</strong> (mâchoire serrée), <span class="red">rictus sardonique</span>, opisthotonus (arc de cercle du dos), spasmes généralisés. Dans les cas graves, les contractions entraînent l\'<em>asphyxie</em>. Sans traitement, mortalité : <span class="red">~30%</span>.',
+    build(W,H) {
+      const objs=[];
+      // Blocked nerves
+      const n1=new NerveCell(W*.2,H*.5,{w:55,h:180,signalActive:false,blocked:true,label:'BLOQUÉ',color:'#ff4060'});
+      const n2=new NerveCell(W*.5,H*.5,{w:55,h:180,signalActive:false,blocked:true,label:'BLOQUÉ',color:'#ff4060'});
+      const n3=new NerveCell(W*.8,H*.5,{w:55,h:180,signalActive:false,blocked:true,label:'BLOQUÉ',color:'#ff4060'});
+      objs.push(n1,n2,n3);
+      // Spasming muscles
+      for(let i=0;i<4;i++) {
+        const m=new MuscleFiber(rand(W*.1,W*.9),rand(H*.2,H*.35),{w:rand(120,200),h:rand(18,30),spasm:true,color:'#ff4060',label:i===0?'SPASME':''});
+        objs.push(m);
+      }
+      for(let i=0;i<4;i++) {
+        const m=new MuscleFiber(rand(W*.1,W*.9),rand(H*.65,H*.8),{w:rand(120,200),h:rand(18,30),spasm:true,color:'#ff4060'});
+        objs.push(m);
+      }
+      // Toxins in background
+      for(let i=0;i<6;i++) {
+        const tx=new ToxinMolecule(rand(W*.05,W*.95),rand(H*.1,H*.9),{size:rand(12,20),color:'#aa66ff'});
+        tx.targetAlpha=rand(.2,.5); objs.push(tx);
+      }
+      return objs;
+    }
+  },
+
+  // 4: EPIDEMIOLOGY — Belgium stats
+  {
+    chapter:'ÉPIDÉMIOLOGIE',
+    tag:'04 — Belgique · Sciensano',
+    title:'TÉTANOS\nEN BELGIQUE',
+    body:'Grâce à la vaccination, le tétanos est devenu <span class="green">exceptionnel</span>. <strong>< 10 cas hospitalisés/an</strong> en Belgique. Entre 2000 et 2013 : <span class="red">17 décès</span>, tous chez des personnes <em>de plus de 60 ans</em> dont la vaccination n\'était plus à jour. Le risque persiste chez les <strong>seniors</strong> et jardiniers non rappelés.',
+    build(W,H) {
+      const objs=[];
+      // A few dim, contained spores (showing rarity)
+      for(let i=0;i<3;i++) {
+        const s=new Spore(rand(W*.2,W*.5),rand(H*.3,H*.7),{w:rand(35,55)});
+        s.tx=rand(W*.2,W*.5); s.ty=rand(H*.3,H*.7);
+        s.targetAlpha=.4; objs.push(s);
+      }
+      // Shield/protection atoms in majority
+      for(let i=0;i<15;i++) {
+        const a=new Atom({x:rand(W*.4,W*.95),y:rand(H*.15,H*.85),r:rand(8,18),color:'#00e5c3',shell:i<6?1:0,wobble:rand(2,5)});
+        a.targetAlpha=rand(.4,.9); a.alpha=0; objs.push(a);
+      }
+      // Some antibodies
+      for(let i=0;i<8;i++) {
+        const ab=new Antibody(rand(W*.4,W*.95),rand(H*.2,H*.8),{size:rand(14,22)});
+        ab.tx=rand(W*.45,W*.95); ab.ty=rand(H*.2,H*.8); objs.push(ab);
+      }
+      return objs;
+    }
+  },
+
+  // 5: HOW THE VACCINE WORKS — toxoid
+  {
+    chapter:'LE VACCIN',
+    tag:'05 — Mécanisme vaccinal',
+    title:'DE LA TOXINE\nÀ L\'ANATOXINE',
+    body:'Le vaccin est un <strong>vaccin anatoxique (toxoïde)</strong>. La toxine est cultivée, puis traitée au <em>formaldéhyde (CH₂O)</em> pour devenir inoffensive tout en conservant sa structure antigénique. <span class="green">Zéro bactérie vivante, zéro toxine active.</span> Efficacité : <strong>~100%</strong> avec schéma complet.',
+    build(W,H) {
+      const objs=[];
+      const tox=new ToxinMolecule(W*.22,H*.5,{size:38,color:'#aa66ff'});
+      tox.tx=W*.22; tox.ty=H*.5; tox.targetAlpha=1; tox.spin=.005;
+      objs.push(tox);
+      const fAtoms=[
+        new Atom({x:W*.5,y:H*.5,r:16,color:'#88ccff',label:'C',shell:1}),
+        new Atom({x:W*.5-32,y:H*.5-22,r:11,color:'#ff6644',label:'O',shell:1}),
+        new Atom({x:W*.5+30,y:H*.5+20,r:9,color:'#cccccc',label:'H',shell:0}),
+        new Atom({x:W*.5-30,y:H*.5+24,r:9,color:'#cccccc',label:'H',shell:0}),
+      ];
+      for(const a of fAtoms) { a.tx=a.x; a.ty=a.y; a.targetAlpha=1; a.alpha=0; }
+      fAtoms[0].bonds=[fAtoms[1],fAtoms[2],fAtoms[3]];
+      objs.push(...fAtoms);
+      beams.push(new ProcessingBeam(W*.5,H*.5,W*.22,H*.5,{color:'#ffcc44'}));
+      beams.push(new ProcessingBeam(W*.4,H*.5,W*.62,H*.5,{color:'#ffcc44',width:5}));
+      const ana=new ToxinMolecule(W*.78,H*.5,{size:38,color:'#00e5c3'});
+      ana.tx=W*.78; ana.ty=H*.5; ana.targetAlpha=1; ana.spin=.005;
+      objs.push(ana);
+      // Label arrows (drawn as canvas text via special atoms with label only)
+      const l1=new Atom({x:W*.22,y:H*.3,r:0,color:'#aa66ff',glow:0,label:'TOXIQUE',shell:0});
+      l1.tx=W*.22; l1.ty=H*.3; l1.alpha=0; l1.targetAlpha=0; // just placeholder
+      const l2=new Atom({x:W*.78,y:H*.3,r:0,color:'#00e5c3',glow:0,label:'INOFFENSIVE',shell:0});
+      l2.tx=W*.78; l2.ty=H*.3; l2.alpha=0; l2.targetAlpha=0;
+      objs.push(l1,l2);
+      return objs;
+    }
+  },
+
+  // 6: INJECTION
+  {
+    chapter:'LA VACCINATION',
+    tag:'06 — Injection & adjuvants',
+    title:'L\'INJECTION\nDU VACCIN',
+    body:'L\'anatoxine est injectée avec un <strong>adjuvant (hydroxyde d\'aluminium Al(OH)₃)</strong> qui amplifie la réponse immunitaire. Les <em>cellules dendritiques</em> capturent l\'anatoxine et la présentent aux <strong>lymphocytes B</strong>, qui s\'activent pour produire des anticorps spécifiques.',
+    build(W,H) {
+      const objs=[];
+      // Syringe
+      const syr=new Syringe(W*.25,H*.4,{angle:Math.PI*.2,color:'#00e5c3'});
+      objs.push(syr);
+      // Adjuvant (Al)
+      const al=new Atom({x:W*.18,y:H*.6,r:24,color:'#ffcc44',label:'Al',shell:2,wobble:3});
+      al.tx=W*.18; al.ty=H*.6; al.targetAlpha=1; objs.push(al);
+      // Anatoxins entering
+      for(let i=0;i<6;i++) {
+        const a=new ToxinMolecule(rand(W*.05,W*.35),rand(H*.2,H*.8),{size:rand(14,26),color:'#00e5c3'});
+        a.tx=rand(W*.1,W*.5); a.ty=rand(H*.2,H*.8); a.vx=rand(1,3); objs.push(a);
+      }
+      // Dendritic cell
+      const dc=new Atom({x:W*.58,y:H*.45,r:32,color:'#ff8844',label:'DC',shell:1,wobble:2});
+      dc.tx=W*.58; dc.ty=H*.45; dc.targetAlpha=1; objs.push(dc);
+      // B lymphocytes
+      for(let i=0;i<4;i++) {
+        const b=new Atom({x:rand(W*.68,W*.92),y:rand(H*.3,H*.72),r:rand(18,26),color:'#4488ff',label:'B',shell:1,wobble:3});
+        b.tx=rand(W*.68,W*.92); b.ty=rand(H*.3,H*.72); b.targetAlpha=1; objs.push(b);
+      }
+      return objs;
+    }
+  },
+
+  // 7: IMMUNE RESPONSE
+  {
+    chapter:'RÉPONSE IMMUNITAIRE',
+    tag:'07 — Production d\'anticorps',
+    title:'LA FABRIQUE\nD\'ANTICORPS',
+    body:'Les <strong>plasmocytes</strong> (lymphocytes B activés) produisent des millions d\'anticorps anti-tétaniques. Ces <em>immunoglobulines IgG</em> reconnaissent spécifiquement la tétanospasmine et la neutralisent <span class="green">avant</span> qu\'elle n\'atteigne les neurones. C\'est la mémoire immunitaire qui se crée.',
+    build(W,H) {
+      const objs=[];
+      const plasma=new Atom({x:W*.2,y:H*.5,r:44,color:'#aa66ff',label:'PC',shell:2,wobble:2});
+      plasma.tx=W*.2; plasma.ty=H*.5; plasma.targetAlpha=1; objs.push(plasma);
+      for(let i=0;i<14;i++) {
+        const angle=rand(0,PI2); const d=rand(90,200);
+        const ab=new Antibody(W*.2+Math.cos(angle)*d,H*.5+Math.sin(angle)*d,{size:rand(16,26)});
+        ab.tx=rand(W*.35,W*.92); ab.ty=rand(H*.2,H*.8);
+        ab.vx=Math.cos(angle)*2; ab.vy=Math.sin(angle)*2; objs.push(ab);
+      }
+      for(let i=0;i<5;i++) {
+        const tx=new ToxinMolecule(rand(W*.5,W*.92),rand(H*.25,H*.75),{size:rand(18,28),color:'#aa66ff'});
+        tx.tx=rand(W*.5,W*.92); tx.ty=rand(H*.25,H*.75); objs.push(tx);
+      }
+      return objs;
+    }
+  },
+
+  // 8: NEUTRALIZATION
+  {
+    chapter:'NEUTRALISATION',
+    tag:'08 — Immunité acquise',
+    title:'ANTICORPS\nCONTRE TOXINE',
+    body:'Lors d\'une vraie infection, les <strong>anticorps mémoire</strong> se mobilisent en <em>quelques heures</em>. Chaque anticorps se fixe sur un épitope de la tétanospasmine et la neutralise. La toxine ne peut plus atteindre les neurones. <span class="green">Protection : ~100%</span> lorsque le schéma est complet.',
+    build(W,H) {
+      const objs=[];
+      const toxins=[];
+      for(let i=0;i<8;i++) {
+        const tx=new ToxinMolecule(rand(W*.1,W*.9),rand(H*.15,H*.8),{size:rand(20,32),color:'#aa66ff'});
+        tx.tx=rand(W*.15,W*.85); tx.ty=rand(H*.2,H*.75);
+        objs.push(tx); toxins.push(tx);
+      }
+      for(let i=0;i<12;i++) {
+        const ab=new Antibody(rand(W*.05,W*.95),rand(H*.1,H*.9),{size:rand(18,28)});
+        ab.tx=rand(W*.1,W*.9); ab.ty=rand(H*.2,H*.8);
+        if(toxins[i%toxins.length]) ab.target=toxins[i%toxins.length];
+        objs.push(ab);
+      }
+      return objs;
+    }
+  },
+
+  // 9: VACCINATION SCHEDULE BELGIUM
+  {
+    chapter:'CALENDRIER VACCINAL',
+    tag:'09 — Belgique 2025-2026',
+    title:'CALENDRIER\nVACCINAL',
+    body:'En Fédération Wallonie-Bruxelles, le vaccin est <strong>recommandé dès la naissance</strong>. <em>Nourrissons</em> : 8 sem, 12 sem, 16 sem + rappel 15 mois (hexavalent). <strong>Rappels</strong> : 5-6 ans, 15-16 ans, puis <span class="gold">tous les 10 ans</span> à l\'âge adulte. Gratuit pour les enfants via l\'ONE.',
+    onEnter() {
+      const ov=document.getElementById('calendar-overlay');
+      ov.style.display='flex';
+      ov.innerHTML=`
+        <div class="cal-row"><div class="cal-age">2 mois</div><div class="cal-label">1ère dose · hexavalent</div></div>
+        <div class="cal-row"><div class="cal-age">3 mois</div><div class="cal-label">2ème dose</div></div>
+        <div class="cal-row"><div class="cal-age">4 mois</div><div class="cal-label">3ème dose</div></div>
+        <div class="cal-row"><div class="cal-age">15 mois</div><div class="cal-label">Rappel nourrisson</div></div>
+        <div class="cal-row"><div class="cal-age">5-6 ans</div><div class="cal-label">Rappel enfant</div></div>
+        <div class="cal-row"><div class="cal-age">15-16 ans</div><div class="cal-label">Rappel ado + coqueluche</div></div>
+        <div class="cal-row"><div class="cal-age">Adulte</div><div class="cal-label">Rappel tous les 10 ans</div></div>
+        <div class="cal-row"><div class="cal-age">+65 ans</div><div class="cal-label">Rappel renforcé</div></div>
+      `;
+    },
+    onLeave() { document.getElementById('calendar-overlay').style.display='none'; },
+    build(W,H) {
+      const objs=[];
+      // Timeline atoms (age markers)
+      const ages=[2,12,15,60,120,180,600];
+      const colors=['#00e5c3','#00e5c3','#00e5c3','#4488ff','#4488ff','#ffcc44','#ffcc44'];
+      for(let i=0;i<ages.length;i++) {
+        const a=new Atom({x:rand(W*.05,W*.45),y:rand(H*.2,H*.8),r:rand(12,22),color:colors[i],shell:1,wobble:rand(2,5),label:'+'});
+        a.tx=rand(W*.05,W*.45); a.ty=rand(H*.2,H*.8); a.targetAlpha=rand(.5,.9); a.alpha=0; objs.push(a);
+      }
+      // Shield antibodies
+      for(let i=0;i<10;i++) {
+        const ab=new Antibody(rand(W*.05,W*.5),rand(H*.1,H*.9),{size:rand(14,22),color:'#00e5c3'});
+        ab.tx=rand(W*.05,W*.5); ab.ty=rand(H*.15,H*.85); objs.push(ab);
+      }
+      return objs;
+    }
+  },
+
+  // 10: SAFETY
+  {
+    chapter:'SÉCURITÉ DU VACCIN',
+    tag:'10 — Effets secondaires',
+    title:'SÉCURITÉ\n& TOLÉRANCE',
+    body:'Utilisé depuis <strong>près de 100 ans</strong>, le vaccin est extrêmement sûr. <span class="green">Effets bénins</span> : douleur/rougeur au site d\'injection, légère fièvre, fatigue passagère. Les réactions graves (allergie) sont <em>extrêmement rares</em>. <strong>Recommandé pendant la grossesse</strong> pour protéger le nouveau-né.',
+    onEnter() {
+      const ov=document.getElementById('safety-overlay');
+      ov.style.display='flex';
+      ov.innerHTML=`
+        <div class="safety-item"><div class="safety-icon">✅</div><div class="safety-text">Douleur locale bénigne</div></div>
+        <div class="safety-item"><div class="safety-icon">✅</div><div class="safety-text">Légère fièvre possible</div></div>
+        <div class="safety-item"><div class="safety-icon">✅</div><div class="safety-text">Fatigue passagère</div></div>
+        <div class="safety-item"><div class="safety-icon">🤰</div><div class="safety-text">Sûr pendant la grossesse</div></div>
+        <div class="safety-item bad"><div class="safety-icon">⚠️</div><div class="safety-text">Allergie grave : très rare</div></div>
+      `;
+    },
+    onLeave() { document.getElementById('safety-overlay').style.display='none'; },
+    build(W,H) {
+      const objs=[];
+      // Healthy nerve cells (signal flowing)
+      for(let i=0;i<4;i++) {
+        const nc=new NerveCell(rand(W*.1,W*.9),H*.5,{w:rand(40,60),h:rand(150,200),signalActive:true,blocked:false,color:'#00e5c3'});
+        objs.push(nc);
+      }
+      // Lots of antibodies (protection)
+      for(let i=0;i<16;i++) {
+        const ab=new Antibody(rand(W*.05,W*.95),rand(H*.1,H*.9),{size:rand(12,24),color:'#00e5c3'});
+        ab.tx=rand(W*.05,W*.95); ab.ty=rand(H*.15,H*.85); objs.push(ab);
+      }
+      // Syringe
+      const syr=new Syringe(W*.15,H*.4,{angle:Math.PI*.18,color:'#00e5c3'});
+      objs.push(syr);
+      return objs;
+    }
+  },
+
+  // 11: MEMORY — long-term immunity
+  {
+    chapter:'IMMUNITÉ À LONG TERME',
+    tag:'11 — Mémoire & rappels',
+    title:'MÉMOIRE\nIMMUNITAIRE',
+    body:'Après le schéma complet, des <strong>lymphocytes B et T mémoire</strong> persistent des années. Un rappel tous les <em>10 ans</em> maintient un titre d\'anticorps protecteur. <span class="red">Sans rappel, la protection s\'effrite</span> — notamment après 65 ans. <strong>Vérifiez votre carnet vaccinal.</strong>',
+    build(W,H) {
+      const objs=[];
+      for(let i=0;i<8;i++) {
+        const isT=i<4;
+        const a=new Atom({x:rand(W*.1,W*.9),y:rand(H*.15,H*.75),r:rand(20,32),color:isT?'#00e5c3':'#4488ff',label:isT?'Bm':'Tm',shell:2,wobble:5,orbitSpeed:rand(.5,1.2)});
+        a.tx=rand(W*.1,W*.9); a.ty=rand(H*.15,H*.75);
+        a.targetAlpha=rand(.6,1); a.alpha=0; objs.push(a);
+      }
+      for(let i=0;i<15;i++) {
+        const ab=new Antibody(rand(0,W),rand(100,H-100),{size:rand(14,24),color:'#00e5c3'});
+        ab.tx=rand(W*.05,W*.95); ab.ty=rand(H*.15,H*.8); ab.target=null; objs.push(ab);
+      }
+      for(let i=0;i<3;i++) {
+        const tx=new ToxinMolecule(rand(W*.1,W*.9),rand(H*.2,H*.75),{size:14,color:'#aa66ff',targetAlpha:.2});
+        tx.tx=rand(W*.1,W*.9); tx.ty=rand(H*.2,H*.75); objs.push(tx);
+      }
+      return objs;
+    }
+  },
+
+  // 12: CONCLUSION — call to action
+  {
+    chapter:'CONCLUSION',
+    tag:'12 — Appel à l\'action',
+    title:'PROTÉGEZ-VOUS\nPROTÉGEZ LES VÔTRES',
+    body:'Le vaccin contre le tétanos est <span class="green">simple, efficace et indispensable</span> tout au long de la vie. <strong>Une petite piqûre tous les 10 ans</strong> peut vous sauver la vie. Consultez votre médecin ou le site <em>vaccination-info.be</em>. Partagez cette information — elle peut faire la différence.',
+    build(W,H) {
+      const objs=[];
+      // Big central shield atom
+      const shield=new Atom({x:CX,y:CY-30,r:60,color:'#00e5c3',label:'✓',shell:3,wobble:2,glow:1.8});
+      shield.tx=CX; shield.ty=CY-30; shield.targetAlpha=1; objs.push(shield);
+      // Orbit of antibodies
+      for(let i=0;i<20;i++) {
+        const angle=i/20*PI2; const r=rand(120,220);
+        const ab=new Antibody(CX+Math.cos(angle)*r,CY-30+Math.sin(angle)*r,{size:rand(14,26),color:'#00e5c3'});
+        ab.tx=CX+Math.cos(angle+.2)*rand(100,240); ab.ty=CY-30+Math.sin(angle+.2)*rand(100,240);
+        ab.vx=Math.cos(angle+Math.PI*.5)*1; ab.vy=Math.sin(angle+Math.PI*.5)*1;
+        objs.push(ab);
+      }
+      // A few neutralized toxins in background
+      for(let i=0;i<4;i++) {
+        const tx=new ToxinMolecule(rand(W*.05,W*.95),rand(H*.1,H*.9),{size:rand(12,18),color:'#aa66ff',targetAlpha:.15});
+        tx.tx=rand(W*.1,W*.9); tx.ty=rand(H*.2,H*.8); objs.push(tx);
+      }
+      return objs;
+    }
+  }
+
+];
+
+// ════════════════════════════════════════════════════════════
+// BUILD SCENE
+// ════════════════════════════════════════════════════════════
+function buildScene(n) {
+  sceneObjects=[]; beams=[];
+  // Clean up overlays
+  document.getElementById('calendar-overlay').style.display='none';
+  document.getElementById('safety-overlay').style.display='none';
+  const sc=SCENES[n];
+  if(!sc) return;
+  sceneObjects=sc.build(W,H);
+  if(sc.onEnter) sc.onEnter();
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER LOOP
+// ════════════════════════════════════════════════════════════
+let lastT=0;
+function render(now) {
+  requestAnimationFrame(render);
+  const dt=Math.min((now-lastT)/16,5); lastT=now;
+  t+=dt*.016;
+
+  ctx.clearRect(0,0,W,H);
+  drawGrid(.035);
+
+  for(const p of fieldParticles) { p.update(); p.draw(); }
+
+  for(const b of beams) { b.update(dt); b.draw(); }
+
+  // Connection lines on scene 0
+  if(current===0) {
+    const atoms=sceneObjects.filter(o=>o instanceof Atom||o.constructor.name==='Atom');
+    ctx.save();
+    for(let i=0;i<atoms.length;i++) {
+      for(let j=i+1;j<atoms.length;j++) {
+        const a=atoms[i], b=atoms[j];
+        const d=dist(a.x,a.y,b.x,b.y);
+        if(d<180) {
+          ctx.globalAlpha=Math.min(a.alpha,b.alpha)*.15*(1-d/180);
+          ctx.strokeStyle=a.color; ctx.lineWidth=.8;
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // Draw bonds first
+  for(const o of sceneObjects) {
+    if(o.dead) continue;
+    if(o.drawBonds) o.drawBonds();
+  }
+
+  // Update & draw all objects
+  for(const o of sceneObjects) {
+    if(o.dead) continue;
+    if(o instanceof Molecule) o.update(dt,t);
+    else if(o.update) o.update(dt,t);
+    if(o.draw) o.draw(t);
+  }
+
+  // Remove dead
+  for(let i=sceneObjects.length-1;i>=0;i--) {
+    if(sceneObjects[i].dead) sceneObjects.splice(i,1);
+  }
+
+  // Tooltip
+  const allAtoms=sceneObjects.filter(o=>o.r&&o.draw&&!o.dead&&!o.spasm);
+  const hover=allAtoms.find(o=>dist(o.x,o.y,mx,my)<(o.r||20)+14);
+  document.getElementById('tooltip').style.opacity=hover?'1':'0';
+  if(hover) {
+    document.getElementById('tooltip').style.left=(mx+18)+'px';
+    document.getElementById('tooltip').style.top=(my-12)+'px';
+    document.getElementById('tooltip').textContent=hover.label||hover.type||'Élément';
+  }
+}
+requestAnimationFrame(render);
+
+// ════════════════════════════════════════════════════════════
+// HUD UPDATE
+// ════════════════════════════════════════════════════════════
+function updateHUD() {
+  const sc=SCENES[current];
+  document.getElementById('prog-bar').style.width=((current/(TOTAL-1))*100)+'%';
+  document.getElementById('prog-text').textContent=String(current+1).padStart(2,'0')+' / '+String(TOTAL).padStart(2,'0');
+  document.getElementById('chapter').textContent=sc.chapter||'';
+  document.getElementById('scene-tag').textContent=sc.tag||'';
+
+  // Animate title lines
+  const titleLines=sc.title.split('\n');
+  document.getElementById('scene-title').innerHTML=titleLines.map((l,i)=>
+    `<span style="display:block;color:${i===1?'var(--teal)':'var(--white)'};">${l}</span>`).join('');
+  document.getElementById('scene-body').innerHTML=sc.body||'';
+  document.getElementById('click-hint').style.display=current===TOTAL-1?'none':'block';
+
+  // Dots
+  document.querySelectorAll('.dot').forEach((d,i)=>{
+    d.className='dot'+(i===current?' active':i<current?' done':'');
+  });
+
+  // Show end screen on last scene
+  if(current===TOTAL-1) {
+    setTimeout(()=>document.getElementById('end-screen').classList.add('show'),3500);
+  }
+}
+
+function flash(cb) {
+  const f=document.getElementById('flash');
+  f.style.opacity='.06';
+  setTimeout(()=>{ f.style.opacity='0'; setTimeout(cb,80); },130);
+}
+
+function goToScene(n) {
+  if(animating||n===current) return;
+  // Leave hook
+  if(SCENES[current] && SCENES[current].onLeave) SCENES[current].onLeave();
+  animating=true;
+  flash(()=>{
+    current=n;
+    buildScene(current);
+    updateHUD();
+    setTimeout(()=>animating=false,700);
+  });
+}
+
+function nextScene() {
+  if(current<TOTAL-1) goToScene(current+1);
+}
+
+// ════════════════════════════════════════════════════════════
+// INIT DOTS
+// ════════════════════════════════════════════════════════════
+const dotsEl=document.getElementById('dots');
+for(let i=0;i<TOTAL;i++) {
+  const d=document.createElement('div');
+  d.className='dot';
+  d.addEventListener('click',()=>goToScene(i));
+  dotsEl.appendChild(d);
+}
+
+// ════════════════════════════════════════════════════════════
+// EVENTS
+// ════════════════════════════════════════════════════════════
+document.addEventListener('click',e=>{
+  if(e.target.closest('.dot')||e.target.id==='title-start'||e.target.id==='end-restart') return;
+  if(!titleVisible) nextScene();
+});
+document.addEventListener('keydown',e=>{
+  if(titleVisible) return;
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='Enter') nextScene();
+  if(e.key==='ArrowLeft'&&current>0) goToScene(current-1);
+  if(e.key==='Home') goToScene(0);
+  if(e.key==='End') goToScene(TOTAL-1);
+});
+let txS=0;
+document.addEventListener('touchstart',e=>txS=e.changedTouches[0].clientX,{passive:true});
+document.addEventListener('touchend',e=>{
+  if(titleVisible) return;
+  const dx=e.changedTouches[0].clientX-txS;
+  if(Math.abs(dx)>50){ if(dx<0)nextScene(); else if(current>0)goToScene(current-1); }
+  else nextScene();
+},{passive:true});
+
+// ════════════════════════════════════════════════════════════
+// TITLE SCREEN
+// ════════════════════════════════════════════════════════════
+let titleVisible=true;
+document.getElementById('title-start').addEventListener('click',()=>{
+  titleVisible=false;
+  const ts=document.getElementById('title-screen');
+  ts.classList.add('hidden');
+  goToScene(0);
+});
+
+// ════════════════════════════════════════════════════════════
+// END SCREEN RESTART
+// ════════════════════════════════════════════════════════════
+document.getElementById('end-restart').addEventListener('click',()=>{
+  document.getElementById('end-screen').classList.remove('show');
+  goToScene(0);
+});
+
+// ════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════
+function hexToRgb(hex) {
+  if(!hex||hex.length<7) return '0,0,0';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+// ════════════════════════════════════════════════════════════
+// START — keep title screen until user clicks
+// ════════════════════════════════════════════════════════════
+buildScene(0); // preload scene 0 in background
+</script>
+</body>
+</html>
